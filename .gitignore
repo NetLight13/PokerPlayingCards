@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# Manual
+*Debug*
+*.sln
+.vs
+*.vcxproj*
