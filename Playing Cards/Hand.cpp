@@ -6,12 +6,12 @@ Hand::Hand(HANDS hands, std::vector<Card> highestCards)
 {
 	m_handrank = hands;
 	m_highestCards = highestCards;
+	m_initialized = true;
 }
 
 Hand::Hand() {
-
+	m_initialized = false;
 }
-
 
 Hand::~Hand()
 {
@@ -37,13 +37,106 @@ bool sortSuitPrevious(Card card1, Card card2) {
 
 bool Hand::isValid()
 {
+	return m_initialized && (!m_highestCards.empty() || m_highestCards[0].isValid() || (m_handrank >= 1 && m_handrank <= 9));
+}
+
+bool Hand::operator<(const Hand & h) const
+{
+	if (m_handrank < h.m_handrank) {
+		return true;
+	}
+	if (m_handrank > h.m_handrank) {
+		return false;
+	}
+	for (int i = 0; i < 5; i++) {
+		if (m_highestCards[i].getValue() < h.m_highestCards[i].getValue()) {
+			return true;
+		}
+		if (m_highestCards[i].getValue() > h.m_highestCards[i].getValue()) {
+			return false;
+		}
+	}
 	return false;
+}
+
+bool Hand::operator>(const Hand & h) const
+{
+	if (m_handrank > h.m_handrank) {
+		return true;
+	}
+	if (m_handrank < h.m_handrank) {
+		return false;
+	}
+	for (int i = 0; i < 5; i++) {
+		if (m_highestCards[i].getValue() > h.m_highestCards[i].getValue()) {
+			return true;
+		}
+		if (m_highestCards[i].getValue() < h.m_highestCards[i].getValue()) {
+			return false;
+		}
+	}
+	return false;
+}
+
+bool Hand::operator==(const Hand & h) const
+{
+	if (m_handrank < h.m_handrank) {
+		return false;
+	}
+	if (m_handrank > h.m_handrank) {
+		return false;
+	}
+	for (int i = 0; i < 5; i++) {
+		if (m_highestCards[i].getValue() < h.m_highestCards[i].getValue()) {
+			return false;
+		}
+		if (m_highestCards[i].getValue() > h.m_highestCards[i].getValue()) {
+			return false;
+		}
+	}
+	return true;
 }
 
 Hand Hand::getHighestHand(std::vector<Card> playerhand, std::vector<Card> opencards)
 {
-	
-	return Hand();
+	std::vector<Card> combinedHand = playerhand;
+	for (unsigned int i = 0; i < opencards.size(); i++) {
+		combinedHand.emplace_back(opencards[i]);
+	}
+
+	Hand ret;
+	ret = Hand::hasRoyalFlush(combinedHand);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasStraightFlush(combinedHand);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasNOfAKind(combinedHand, 4);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasFullHouse(combinedHand);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasFlush(combinedHand);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasStraight(combinedHand);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasNOfAKind(combinedHand, 3);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasTwoPairs(combinedHand);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasNOfAKind(combinedHand, 2);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasRoyalFlush(combinedHand);
+	if (ret.isValid())
+		return ret;
+	ret = Hand::hasHighestCard(combinedHand);
+	return ret;
 }
 
 float Hand::chancesForPlayerPerspective(HANDS hand, std::vector<Card> playerhand, std::vector<Card> opencards)
@@ -231,14 +324,54 @@ Hand Hand::hasTwoPairs(std::vector<Card> cards)
 				if (firstPairFound) {
 					bool secondPairFound = false;
 					for (unsigned int s = 2; s < cards.size() - i; s++) {
-						for(unsigned int t = 1; t < cards.size() - i - s; t++)
-						if (values[i + t + s] == values[i + s]) {
-							secondPairFound = true;
-							ret.emplace_back(cards[i + s]);
-							ret.emplace_back(cards[i + s + t]);
-							if (secondPairFound) {
-								Hand::fillHand(ret, cards);
-								return Hand(HANDS(2), ret);
+						for (unsigned int t = 1; t < cards.size() - i - s; t++)
+							if (values[i + t + s] == values[i + s]) {
+								secondPairFound = true;
+								ret.emplace_back(cards[i + s]);
+								ret.emplace_back(cards[i + s + t]);
+								if (secondPairFound) {
+									Hand::fillHand(ret, cards);
+									return Hand(HANDS(2), ret);
+								}
+							}
+					}
+				}
+			}
+		}
+	}
+	return Hand();
+}
+
+Hand Hand::hasFullHouse(std::vector<Card> cards)
+{
+	if (cards.size() < 4) {
+		return Hand();
+	}
+
+	int values[7];
+	std::sort(cards.begin(), cards.end(), sortValuePreviousAceHigh);
+	for (unsigned int i = 0; i < 7 && i < cards.size(); i++) {
+		values[i] = cards[i].getValue();
+	}
+	unsigned int sameValueFound = 1;
+	for (unsigned int i = 0; i < cards.size() - (3 - 1); i++) {
+		sameValueFound = 1;
+		std::vector<Card> ret;
+		ret.emplace_back(cards[i]);
+
+		for (unsigned int j = 1; j < cards.size() - i; j++) {
+			if (values[i + j] == values[i]) {
+				sameValueFound++;
+				ret.emplace_back(cards[i + j]);
+
+				if (sameValueFound == 3) {
+					//triple found
+					for (unsigned int s = 0; s < cards.size(); s++) {
+						for (unsigned int t = 1; t < cards.size(); t++) {
+							if (values[s] != ret[0].getValue() && values[t + s] == values[s]) {
+								ret.emplace_back(cards[s]);
+								ret.emplace_back(cards[s + t]);
+								return Hand(HANDS(6), ret);
 							}
 						}
 					}
@@ -246,7 +379,112 @@ Hand Hand::hasTwoPairs(std::vector<Card> cards)
 			}
 		}
 	}
+
 	return Hand();
+}
+
+Hand Hand::hasStraightFlush(std::vector<Card> cards)
+{
+	if (cards.size() < 5) {
+		return Hand();
+	}
+	int values[7];
+
+	//High Straight
+	std::sort(cards.begin(), cards.end(), sortValuePreviousAceHigh);
+	for (int i = 0; i < 7; i++) {
+		values[i] = cards[i].getValue();
+		if (values[i] == 1) {
+			values[i] = 14;
+		}
+	}
+	bool valueFound = false;
+	for (unsigned int i = 0; i < cards.size() - 4; i++) {
+		std::vector<Card> ret;
+		ret.emplace_back(cards[i]);
+		for (int diff = 1; diff < 5; diff++) {
+			valueFound = false;
+			for (unsigned int j = 1; j < 7 - i && !valueFound; j++) {
+				if (values[i + j] - values[i] == -diff && ret[0].getSuit() == cards[i + j].getSuit()) {
+					valueFound = true;
+					ret.emplace_back(cards[i + j]);
+					if (ret.size() == 5) {
+						return Hand(HANDS(8), ret);
+					}
+				}
+			}
+		}
+	}
+
+	//Low Straight with ACE as 1
+	std::sort(cards.begin(), cards.end(), sortValuePreviousAceLow);
+	for (int i = 0; i < 7; i++) {
+		values[i] = cards[i].getValue();
+	}
+	for (unsigned int i = 0; i < cards.size() - 4; i++) {
+		std::vector<Card> ret;
+		ret.emplace_back(cards[i]);
+		for (int diff = 1; diff < 5; diff++) {
+			valueFound = false;
+			for (unsigned int j = 1; j < 7 - i && !valueFound; j++) {
+				if (values[i + j] - values[i] == -diff && ret[0].getSuit() == cards[i + j].getSuit()) {
+					valueFound = true;
+					ret.emplace_back(cards[i + j]);
+					if (ret.size() == 5) {
+						return Hand(HANDS(8), ret);
+					}
+				}
+			}
+		}
+	}
+
+	return Hand();
+}
+
+Hand Hand::hasRoyalFlush(std::vector<Card> cards)
+{
+	if (cards.size() < 5) {
+		return Hand();
+	}
+	int values[7];
+
+	std::sort(cards.begin(), cards.end(), sortValuePreviousAceHigh);
+	for (int i = 0; i < 7; i++) {
+		values[i] = cards[i].getValue();
+		if (values[i] == 1) {
+			values[i] = 14;
+		}
+	}
+	bool valueFound = false;
+	for (unsigned int i = 0; i < cards.size() - 4; i++) {
+		if (cards[i].getValue() == 1) {
+			std::vector<Card> ret;
+			ret.emplace_back(cards[i]);
+			for (int diff = 1; diff < 5; diff++) {
+				valueFound = false;
+				for (unsigned int j = 1; j < 7 - i && !valueFound; j++) {
+					if (values[i + j] - values[i] == -diff && ret[0].getSuit() == cards[i + j].getSuit()) {
+						valueFound = true;
+						ret.emplace_back(cards[i + j]);
+						if (ret.size() == 5) {
+							return Hand(HANDS(9), ret);
+						}
+					}
+				}
+			}
+		}
+	}
+	return Hand();
+}
+
+Hand Hand::hasHighestCard(std::vector<Card> cards)
+{
+	std::sort(cards.begin(), cards.end(), sortValuePreviousAceHigh);
+	std::vector<Card> ret;
+	for (unsigned int i = 0; i < 5 && i < cards.size(); i++) {
+		ret.emplace_back(cards[i]);
+	}
+	return Hand(HANDS(0), ret);
 }
 
 std::string valueToString(int value) {
@@ -262,8 +500,8 @@ std::string valueToString(int value) {
 
 std::ostream & operator<<(std::ostream & out, const Hand & hand)
 {
-	if (hand.m_highestCards.empty() || !hand.m_highestCards[0].isValid() || hand.m_handrank < 1 || hand.m_handrank > 9) {
-		out << "<Invalid>";
+	if (hand.m_highestCards.empty() || !hand.m_highestCards[0].isValid() || hand.m_handrank < 0 || hand.m_handrank > 9) {
+		out << "<Invalid Hand>";
 		return out;
 	}
 
@@ -272,7 +510,7 @@ std::ostream & operator<<(std::ostream & out, const Hand & hand)
 	switch (handrank)
 	{
 	case HIGHESTCARD:
-		out << "Highest Card: ";
+		out << "Highest Card";
 		break;
 	case PAIR:
 		out << "Pair of " << valueToString(hand.m_highestCards[0].getValue());

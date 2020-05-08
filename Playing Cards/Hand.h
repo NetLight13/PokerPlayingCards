@@ -25,7 +25,7 @@ public:
 private:
 	Hand();
 	Hand(HANDS hands, std::vector<Card> highestCards);
-	Hand(const Hand& hand);
+	bool m_initialized;
 	
 public:
 	~Hand();
@@ -39,6 +39,7 @@ public:
 	static Hand hasFullHouse(std::vector<Card> cards);
 	static Hand hasStraightFlush(std::vector<Card> cards);
 	static Hand hasRoyalFlush(std::vector<Card> cards);
+	static Hand hasHighestCard(std::vector<Card> cards);
 	bool isValid();
 	bool operator<(const Hand & h) const;
 	bool operator>(const Hand & h) const;

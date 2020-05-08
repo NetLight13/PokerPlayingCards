@@ -18,6 +18,7 @@ Deck::~Deck()
 
 void Deck::shuffle()
 {
+	srand(time(NULL));
 	std::vector<Card> shuffledDeck;
 	for (int size = remainingCards(); size > 0; size--) {
 		auto pick = rand() % size;
